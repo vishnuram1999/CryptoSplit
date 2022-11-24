@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.15;
+pragma solidity 0.8.17;
 
 error notOwner();
 error notMember(address, string);
@@ -7,11 +7,11 @@ error notMember(address, string);
 contract MoneySplit {
 
     address public owner;
-    uint public idNumber;
+    uint internal idNumber;
 
     constructor() {
         owner = msg.sender;
-         idNumber = 0;
+        idNumber = 0;
     }
 
     modifier onlyOwner() {
@@ -26,6 +26,7 @@ contract MoneySplit {
         string name;
         uint amountSpend;
         mapping(string => uint) expenses;
+        mapping(address => uint) balances;
     }
 
     struct Group {
@@ -38,6 +39,8 @@ contract MoneySplit {
     mapping(string => Group) public groups;
 
     function createAccount(string memory _name) public {
+        require(bytes(_name).length != 0, "Enter a name to account");
+        require(members[address(msg.sender)].id == address(0x0), "already account exists");
         members[address(msg.sender)].id = address(msg.sender);
         members[address(msg.sender)].name = _name;
         members[address(msg.sender)].amountSpend = 0;
@@ -54,10 +57,13 @@ contract MoneySplit {
         return members[address(_id)].amountSpend;
     }
 
-    function addExpense(string memory _expenseName, uint _amount) public {
+    function addExpense(string memory _expenseName, uint _amount, address _paidID) public {
         require(members[address(msg.sender)].id != address(0x0), "You don't have an account, Create one!");
         members[address(msg.sender)].amountSpend += _amount;
         members[address(msg.sender)].expenses[_expenseName] = _amount;
+        if (address(msg.sender) != address(_paidID)) {
+            members[address(msg.sender)].balances[address(_paidID)] = _amount;
+        }
     }
 
     function createGroup(string memory _groupName, address[] memory _group) public { 
@@ -78,7 +84,19 @@ contract MoneySplit {
         groups[_groupName].groupMembers.push(_id);
     }
 
-    function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount) public {
+    function removeMemberToGroup(string calldata _groupName, address _id) public {
+        require(members[address(_id)].id != address(0x0), "Address is not a member");
+        uint i = 0;
+        while (groups[_groupName].groupMembers[i] != _id) {
+            i++;
+        }
+        for (uint j=i; j<groups[_groupName].groupMembers.length-1;j++) {
+            groups[_groupName].groupMembers[j] = groups[_groupName].groupMembers[j+1];
+        }
+        delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
+    }
+
+    function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _paidID) public {
         require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
         uint256 lengthOfArray = groups[_groupName].groupMembers.length;
         uint256 amountPerMember = _amount / lengthOfArray;
@@ -87,13 +105,16 @@ contract MoneySplit {
         for (uint i = 0; i < lengthOfArray;) {
             members[address(groups[_groupName].groupMembers[i])].amountSpend += amountPerMember;
             members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = amountPerMember;
+            if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
+                members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = amountPerMember;
+            }
             unchecked {
                 ++i;
             }
         }
     }
 
-    function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions) public {
+    function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions, address _paidID) public {
         require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
         uint256 lengthOfList = _portions.length;
         uint256 sum = 0;
@@ -109,6 +130,9 @@ contract MoneySplit {
         for (uint i = 0; i < lengthOfList;) {
             members[address(groups[_groupName].groupMembers[i])].amountSpend += _portions[i];
             members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = _portions[i];
+            if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
+                members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = _portions[i];
+            }
             unchecked {
                 ++i;
             }
@@ -123,4 +147,12 @@ contract MoneySplit {
         return (_expenseName, members[address(msg.sender)].expenses[_expenseName]);
     }
 
+    function settleBalance(address _id, uint _amount) public {
+        require(members[address(msg.sender)].balances[address(_id)] >= _amount, "Amount entered is greater than actual balance");
+        members[address(msg.sender)].balances[address(_id)] -= _amount;
+    }
+
+    function showBalances(address _id) public view returns(uint) {
+        return members[address(msg.sender)].balances[address(_id)];
+    }
 }
