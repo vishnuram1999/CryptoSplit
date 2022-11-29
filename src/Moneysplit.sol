@@ -1,5 +1,5 @@
-pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: MIT
+pragma solidity >=0.8.0 <0.9.0;
 
 error notOwner();
 error notMember(address, string);
@@ -10,7 +10,6 @@ contract MoneySplit {
   uint internal idNumber;
 
   constructor() payable {
-    // what should we do on deploy?
     owner = msg.sender;
     idNumber = 0;
   }
