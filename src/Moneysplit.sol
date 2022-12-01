@@ -3,6 +3,8 @@ pragma solidity >=0.8.0 <0.9.0;
 
 error notOwner();
 error notMember(address, string);
+error notValidAddress(address, string);
+error notGroupMember(string);
 
 contract MoneySplit {
 
@@ -23,7 +25,20 @@ contract MoneySplit {
 
   modifier onlyMember() {
     if(msg.sender != members[msg.sender].id || msg.sender == address(0x0)) {
-        revert notMember(msg.sender, "Not an member, Create account");
+        revert notMember(msg.sender, "Not an member, Create account or Not a valid address");
+    }
+    _;
+  }
+
+  modifier onlyGroupMember(string calldata _groupName) {
+    uint256 count = 0;
+    for (uint i=0; i<groups[_groupName].groupMembers.length; i++) {
+        if(msg.sender != groups[_groupName].groupMembers[i]) {
+            count++;
+        }
+    }
+    if (count == groups[_groupName].groupMembers.length) {
+        revert notGroupMember("You don't belong to this group");
     }
     _;
   }
@@ -63,7 +78,7 @@ contract MoneySplit {
       return members[address(_id)].amountSpend;
   }
 
-  function addExpense(string memory _expenseName, uint _amount, address _paidID) public onlyOwner {
+  function addExpense(string memory _expenseName, uint _amount, address _paidID) public onlyMember {
       members[address(msg.sender)].amountSpend += _amount;
       members[address(msg.sender)].expenses[_expenseName] = _amount;
       if (address(msg.sender) != address(_paidID)) {
@@ -71,24 +86,24 @@ contract MoneySplit {
       }
   }
 
-  function createGroup(string memory _groupName, address[] memory _group) public onlyOwner { 
+  function createGroup(string memory _groupName, address[] memory _group) public onlyMember{ 
       for (uint i = 0; i < _group.length;) {
-          if(members[address(_group[i])].id == address(0x0)) {
-              revert notMember(members[address(_group[i])].id, "is not a member");
-          }
-          unchecked {
-              ++i;
-          }
+        if(_group[i] != members[_group[i]].id || _group[i] == address(0x0)) {
+            revert notMember(msg.sender, "Not an member, Create account or Not a valid address");
+        }
+        unchecked {
+            ++i;
+        }
       }
       groups[_groupName].groupMembers = _group;
       groups[_groupName].groupExpense = 0;
   }
 
-  function addMemberToGroup(string calldata _groupName, address _id) public onlyMember {
+  function addMemberToGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
       groups[_groupName].groupMembers.push(_id);
   }
 
-  function removeMemberToGroup(string calldata _groupName, address _id) public onlyMember {
+  function removeMemberFromGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
       require(members[address(_id)].id != address(0x0), "Address is not a member");
       uint i = 0;
       while (groups[_groupName].groupMembers[i] != _id) {
@@ -100,7 +115,7 @@ contract MoneySplit {
       delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
   }
 
-  function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _paidID) public onlyMember {
+  function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _paidID) public onlyMember onlyGroupMember(_groupName) {
       require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
       uint256 lengthOfArray = groups[_groupName].groupMembers.length;
       uint256 amountPerMember = _amount / lengthOfArray;
@@ -118,7 +133,7 @@ contract MoneySplit {
       }
   }
 
-  function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions, address _paidID) public onlyMember {
+  function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions, address _paidID) public onlyMember onlyGroupMember(_groupName) {
       require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
       uint256 lengthOfList = _portions.length;
       uint256 sum = 0;
@@ -143,7 +158,7 @@ contract MoneySplit {
       }
   }
 
-  function showExpenseOfGroup(string calldata _groupName) public view onlyMember returns(uint) {
+  function showExpenseOfGroup(string calldata _groupName) public view onlyMember onlyGroupMember(_groupName) returns(uint) {
       return groups[_groupName].groupExpense;
   }
 
