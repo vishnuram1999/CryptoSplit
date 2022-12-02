@@ -68,7 +68,10 @@ contract MoneySplitTest is Test {
         vm.stopPrank();
 
         // denice trying to add alice to rockers group who already exists
-        assert(true);
+        vm.startPrank(denice);
+        vm.expectRevert(bytes("Address already exists in this group!!!"));
+        moneysplit.addMemberToGroup("rockers", alice);
+        vm.stopPrank();
     }
     
     function testCreateGroup() public {

@@ -8,6 +8,9 @@ error notGroupMember(string);
 
 contract MoneySplit {
 
+  event Received(address, uint);
+  event sentDonations(address, uint);
+  
   address public owner;
   uint internal idNumber;
 
@@ -49,6 +52,7 @@ contract MoneySplit {
       uint amountSpend;
       mapping(string => uint) expenses;
       mapping(address => uint) balances;
+      address[] friends;
   }
 
   struct Group {
@@ -100,11 +104,13 @@ contract MoneySplit {
   }
 
   function addMemberToGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
+      for (uint i=0; i<groups[_groupName].groupMembers.length; ++i) {
+        require(_id != groups[_groupName].groupMembers[i], "Address already exists in this group!!!");
+      }
       groups[_groupName].groupMembers.push(_id);
   }
 
   function removeMemberFromGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
-      require(members[address(_id)].id != address(0x0), "Address is not a member");
       uint i = 0;
       while (groups[_groupName].groupMembers[i] != _id) {
           i++;
@@ -166,7 +172,24 @@ contract MoneySplit {
       return (_expenseName, members[address(msg.sender)].expenses[_expenseName]);
   }
 
-  function settleBalance(address _id, uint _amount) onlyMember public {
-      members[address(msg.sender)].balances[address(_id)] -= _amount;
+  function settleBalance(address payable _toID, uint _amount) onlyMember public payable {
+    members[address(msg.sender)].balances[address(_toID)] -= _amount;
+    //   (bool sent, bytes memory data) = _toID.call{value: _amount}("");
+    //   require(sent, "Failed to send balance");
+  }
+
+    // Users can send owner donation to help consistently improve the platform 
+  receive() external payable {
+    emit Received(msg.sender, msg.value);
+  }
+
+  fallback() external payable {
+    emit Received(msg.sender, msg.value);
+  }
+
+  function sendDonationsToOwner(uint _amount) public payable onlyOwner {
+    (bool sent, bytes memory data) = address(this).call{value: _amount}("");
+    require(sent, "Failed to send donations to owner");
+    emit sentDonations(address(msg.sender), _amount);
   }
 }
