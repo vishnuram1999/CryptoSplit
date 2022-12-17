@@ -1,31 +1,37 @@
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
 error notOwner();
 error notMember(address, string);
 error notValidAddress(address, string);
 error notGroupMember(string);
 
-contract MoneySplit {
-
+contract MoneySplit is ReentrancyGuard {
+  
+  // events initialization
   event Received(address, uint);
   event sentDonations(address, uint);
   
   address public owner;
   uint internal idNumber;
 
+  // declaring the constructor with the owner to contract and idNumber
   constructor() payable {
     owner = msg.sender;
     idNumber = 0;
   }
-
+  
+  // modifier to identify the transaction sender is owner or not
   modifier onlyOwner() {
     if(msg.sender == owner) {
         revert notOwner();
     }
     _;
   }
-
+ 
+  // modifier to identify the transaction sender is member of moneysplit application
   modifier onlyMember() {
     if(msg.sender != members[msg.sender].id || msg.sender == address(0x0)) {
         revert notMember(msg.sender, "Not an member, Create account or Not a valid address");
@@ -33,6 +39,7 @@ contract MoneySplit {
     _;
   }
 
+  // modifier to identify the transaction sender is member of specific group or not
   modifier onlyGroupMember(string calldata _groupName) {
     uint256 count = 0;
     for (uint i=0; i<groups[_groupName].groupMembers.length; i++) {
@@ -46,63 +53,71 @@ contract MoneySplit {
     _;
   }
 
+  // initialization of structure - Member 
   struct Member {
-      address id;
-      string name;
-      uint amountSpend;
-      mapping(string => uint) expenses;
-      mapping(address => uint) balances;
-      address[] friends;
+    address id;
+    string name;
+    uint amountSpend;
+    mapping(string => uint) expenses;
+    mapping(address => uint) balances;
+    address[] friends;
   }
-
+  
+  // initialization of structure - Group
   struct Group {
-      address[] groupMembers;
-      uint groupExpense;
-      mapping(string => uint) groupExpensesNameList;
+    address[] groupMembers;
+    uint groupExpense;
+    mapping(string => uint) groupExpensesNameList;
   }
+  
+  mapping(address => Member) public members; // initialization of mapping (dictionary) with key address and value Member structure
+  mapping(string => Group) public groups; // initialization of mapping (dictionary) with key string and value Group structure
 
-  mapping(address => Member) public members;
-  mapping(string => Group) public groups;
-
+  // declaration of function to create a account in moneysplit
   function createAccount(string memory _name) public returns(string memory) {
-        require(address(msg.sender) != address(0x0), "Not Valid an address");
-        require(members[address(msg.sender)].id != address(msg.sender), "You already have an account");
-        members[address(msg.sender)].id = address(msg.sender);
-        members[address(msg.sender)].name = _name;
-        members[address(msg.sender)].amountSpend = 0;
-        idNumber += 1;
-        return "You got an account!!!";
-    }
+    require(address(msg.sender) != address(0x0), "Not Valid an address"); // to verify it is not an address(0)
+    require(members[address(msg.sender)].id != address(msg.sender), "You already have an account"); // to verify whether the transaction sender is not having an account already
+    members[address(msg.sender)].id = address(msg.sender);
+    members[address(msg.sender)].name = _name;
+    members[address(msg.sender)].amountSpend = 0;
+    idNumber += 1;
+    return "You got an account!!!";
+  }
 
+  // decalaration of function to view your expenses so for
   function showExpense() public view onlyMember returns (uint) {
-      return members[address(msg.sender)].amountSpend;
+    return members[address(msg.sender)].amountSpend;
   }
-
+  
+  // function to show expense of specific member in moneysplit but only owner can view it
   function showExpenseOfMember(address _id) public view onlyMember returns (uint) {
-      return members[address(_id)].amountSpend;
+    return members[address(_id)].amountSpend;
   }
-
+  
+  // function to add your expense
   function addExpense(string memory _expenseName, uint _amount, address _paidID) public onlyMember {
-      members[address(msg.sender)].amountSpend += _amount;
-      members[address(msg.sender)].expenses[_expenseName] = _amount;
-      if (address(msg.sender) != address(_paidID)) {
-          members[address(msg.sender)].balances[address(_paidID)] = _amount;
-      }
+    members[address(msg.sender)].amountSpend += _amount;
+    members[address(msg.sender)].expenses[_expenseName] = _amount;
+    if (address(msg.sender) != address(_paidID)) {
+        members[address(msg.sender)].balances[address(_paidID)] = _amount;
+    }
   }
-
+  
+  // function to create a group with specific members
   function createGroup(string memory _groupName, address[] memory _group) public onlyMember{ 
-      for (uint i = 0; i < _group.length;) {
+    for (uint i = 0; i < _group.length;) {
         if(_group[i] != members[_group[i]].id || _group[i] == address(0x0)) {
             revert notMember(msg.sender, "Not an member, Create account or Not a valid address");
         }
         unchecked {
             ++i;
         }
-      }
-      groups[_groupName].groupMembers = _group;
-      groups[_groupName].groupExpense = 0;
+    }
+    groups[_groupName].groupMembers = _group;
+    groups[_groupName].groupExpense = 0;
   }
 
+  // function to add a member to existing the group but only member of that group can do this
   function addMemberToGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
       for (uint i=0; i<groups[_groupName].groupMembers.length; ++i) {
         require(_id != groups[_groupName].groupMembers[i], "Address already exists in this group!!!");
@@ -110,6 +125,7 @@ contract MoneySplit {
       groups[_groupName].groupMembers.push(_id);
   }
 
+  // function to remove a member from existing the group but only member of that group can do this 
   function removeMemberFromGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
       uint i = 0;
       while (groups[_groupName].groupMembers[i] != _id) {
@@ -121,6 +137,7 @@ contract MoneySplit {
       delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
   }
 
+  // function to add a group expense equally between the group memebers
   function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _paidID) public onlyMember onlyGroupMember(_groupName) {
       require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
       uint256 lengthOfArray = groups[_groupName].groupMembers.length;
@@ -128,68 +145,76 @@ contract MoneySplit {
       groups[_groupName].groupExpense += _amount;
       groups[_groupName].groupExpensesNameList[_expenseName] = _amount;
       for (uint i = 0; i < lengthOfArray;) {
-          members[address(groups[_groupName].groupMembers[i])].amountSpend += amountPerMember;
-          members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = amountPerMember;
-          if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
-              members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = amountPerMember;
-          }
-          unchecked {
+            members[address(groups[_groupName].groupMembers[i])].amountSpend += amountPerMember;
+            members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = amountPerMember;
+            if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
+                members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = amountPerMember;
+            }
+            unchecked {
               ++i;
-          }
-      }
+            }
+        }
   }
 
+  // function to add a group expense unequally between the group memebers with their respective portions
   function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions, address _paidID) public onlyMember onlyGroupMember(_groupName) {
-      require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
-      uint256 lengthOfList = _portions.length;
-      uint256 sum = 0;
-      for (uint i = 0; i < lengthOfList;) {
-          sum += _portions[i];
-          unchecked {
-              ++i;
-          }
-      }
-      require(_amount == sum, "Total amount and portions are mismatching, Check Again");
-      groups[_groupName].groupExpense += _amount;
-      groups[_groupName].groupExpensesNameList[_expenseName] = _amount;
-      for (uint i = 0; i < lengthOfList;) {
-          members[address(groups[_groupName].groupMembers[i])].amountSpend += _portions[i];
-          members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = _portions[i];
-          if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
-              members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = _portions[i];
-          }
-          unchecked {
-              ++i;
-          }
-      }
+    require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
+    uint256 lengthOfList = _portions.length;
+    uint256 sum = 0;
+    for (uint i = 0; i < lengthOfList;) {
+        sum += _portions[i];
+        unchecked {
+          ++i;
+        }
+    }
+    require(_amount == sum, "Total amount and portions are mismatching, Check Again");
+    groups[_groupName].groupExpense += _amount;
+    groups[_groupName].groupExpensesNameList[_expenseName] = _amount;
+    for (uint i = 0; i < lengthOfList;) {
+        members[address(groups[_groupName].groupMembers[i])].amountSpend += _portions[i];
+        members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = _portions[i];
+        if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
+          members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = _portions[i];
+        }
+        unchecked {
+            ++i;
+        }
+    }
   }
 
+  // function to show the expense of the group
   function showExpenseOfGroup(string calldata _groupName) public view onlyMember onlyGroupMember(_groupName) returns(uint) {
-      return groups[_groupName].groupExpense;
+    return groups[_groupName].groupExpense;
   }
 
+  // function to search for an expense with the expense name (string)
   function findExpense(string calldata _expenseName) view public onlyMember returns(string memory, uint) {
-      return (_expenseName, members[address(msg.sender)].expenses[_expenseName]);
+    return (_expenseName, members[address(msg.sender)].expenses[_expenseName]);
   }
 
-  function settleBalance(address payable _toID, uint _amount) onlyMember public payable {
+  // function to settle the balance to another member and to avoid the reentrancy attack "nonReentrant" modifier is used
+  function settleBalance(address payable _toID, uint _amount) onlyMember external payable nonReentrant {
     members[address(msg.sender)].balances[address(_toID)] -= _amount;
-    //   (bool sent, bytes memory data) = _toID.call{value: _amount}("");
-    //   require(sent, "Failed to send balance");
+    // sending the ether to another EOA
+    (bool sent,) = _toID.call{value: _amount}("");
+    require(sent, "Failed to send balance");
   }
 
-    // Users can send owner donation to help consistently improve the platform 
+  // Users can send owner donation to help consistently improve the platform 
+  // to receive the ethers which come towards the contract with call data in the transation
   receive() external payable {
-    emit Received(msg.sender, msg.value);
+    emit Received(msg.sender, msg.value); // emit an event to register the receival
   }
 
+  // to receive the ethers which come towards the contract without call data in the transaction
   fallback() external payable {
-    emit Received(msg.sender, msg.value);
+    emit Received(msg.sender, msg.value); // emit an event to register the receival
   }
 
-  function sendDonationsToOwner(uint _amount) public payable onlyOwner {
-    (bool sent, bytes memory data) = address(this).call{value: _amount}("");
+  // to send the ether recevied to the owner of this contract
+  function sendDonationsToOwner(uint _amount) external payable onlyOwner nonReentrant {
+    (bool sent,) = address(this).call{value: _amount}("");
     require(sent, "Failed to send donations to owner");
-    emit sentDonations(address(msg.sender), _amount);
+    emit sentDonations(address(msg.sender), _amount); // emit an event to register the sending the ether to owner
   }
 }

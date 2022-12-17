@@ -48,8 +48,8 @@ contract MoneySplitTest is Test {
         vm.startPrank(alice);
         moneysplit.addExpense("first", 100, alice);
         vm.stopPrank();
-        // assertEq(moneysplit.members(address(alice))., 100);
-        // assertEq(moneysplit.members(address(alice)).amountSpend, 100);
+        (,,uint amountspend) = moneysplit.members(address(alice));
+        assertEq(amountspend, 100);
     }
 
     function testAddMemberToGroup() public {
@@ -89,5 +89,24 @@ contract MoneySplitTest is Test {
         vm.expectRevert();
         moneysplit.createGroup("rockers", _group);
         vm.stopPrank();
+    }
+
+    function testRemoveMemberFromGroup() public {
+        // alice create a group with her and bob
+        address[] memory _group = new address[](2);
+        _group[0] = address(alice);
+        _group[1] = address(bob);
+        vm.startPrank(alice);
+        moneysplit.createGroup("rockers", _group);
+        vm.stopPrank();
+        address[] memory gm = moneysplit.groups("rockers").groupMembers[0];
+        assertEq(gm.length, 2); // checking whether the length is 2 
+
+        // remove a member from the group
+        vm.startPrank(bob);
+        moneysplit.removeMemberFromGroup("rockers", alice);
+        vm.stopPrank();
+
+        // assertEq(moneysplit.groups["rockers"].groupMembers.length, 1); // checking whether the length is 1 because alice is removed
     }
 }
