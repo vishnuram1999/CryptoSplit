@@ -98,15 +98,16 @@ contract MoneySplitTest is Test {
         _group[1] = address(bob);
         vm.startPrank(alice);
         moneysplit.createGroup("rockers", _group);
+        address[] memory gm = moneysplit.showMembers("rockers");
         vm.stopPrank();
-        address[] memory gm = moneysplit.groups("rockers").groupMembers[0];
         assertEq(gm.length, 2); // checking whether the length is 2 
 
         // remove a member from the group
         vm.startPrank(bob);
         moneysplit.removeMemberFromGroup("rockers", alice);
+        gm = moneysplit.showMembers("rockers");
         vm.stopPrank();
 
-        // assertEq(moneysplit.groups["rockers"].groupMembers.length, 1); // checking whether the length is 1 because alice is removed
+        assertEq(gm.length, 1); // checking whether the length is 1 because alice is removed
     }
 }

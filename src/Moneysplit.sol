@@ -1,5 +1,5 @@
 //SPDX-License-Identifier: MIT
-pragma solidity >=0.8.0 <0.9.0;
+pragma solidity ^0.8.15;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
@@ -127,14 +127,25 @@ contract MoneySplit is ReentrancyGuard {
 
   // function to remove a member from existing the group but only member of that group can do this 
   function removeMemberFromGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
-      uint i = 0;
-      while (groups[_groupName].groupMembers[i] != _id) {
-          i++;
-      }
-      for (uint j=i; j<groups[_groupName].groupMembers.length-1;j++) {
-          groups[_groupName].groupMembers[j] = groups[_groupName].groupMembers[j+1];
-      }
-      delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
+    //   uint i = 0;
+    //   while (groups[_groupName].groupMembers[i] != _id) {
+    //       i++;
+    //   }
+    //   for (uint j=i; j<groups[_groupName].groupMembers.length-1;j++) {
+    //       groups[_groupName].groupMembers[j] = groups[_groupName].groupMembers[j+1];
+    //   }
+    //   delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
+    //get the index of address in the array
+    uint index = 0;
+    for (uint j=0; j<groups[_groupName].groupMembers.length-1; j++) {
+        if(address(_id) == address(groups[_groupName].groupMembers[j])) {
+            index = j;
+        }
+    }
+    for (uint256 i = index; i < groups[_groupName].groupMembers.length - 1; i++) {
+            groups[_groupName].groupMembers[i] = groups[_groupName].groupMembers[i+1];
+        }
+    groups[_groupName].groupMembers.pop(); // delete the last item
   }
 
   // function to add a group expense equally between the group memebers
@@ -196,8 +207,8 @@ contract MoneySplit is ReentrancyGuard {
   function settleBalance(address payable _toID, uint _amount) onlyMember external payable nonReentrant {
     members[address(msg.sender)].balances[address(_toID)] -= _amount;
     // sending the ether to another EOA
-    (bool sent,) = _toID.call{value: _amount}("");
-    require(sent, "Failed to send balance");
+    // (bool sent,) = _toID.call{value: _amount}("");
+    // require(sent, "Failed to send balance");
   }
 
   // Users can send owner donation to help consistently improve the platform 
@@ -217,4 +228,9 @@ contract MoneySplit is ReentrancyGuard {
     require(sent, "Failed to send donations to owner");
     emit sentDonations(address(msg.sender), _amount); // emit an event to register the sending the ether to owner
   }
+
+  function showMembers(string calldata _groupName) view public onlyMember onlyGroupMember(_groupName) returns(address[] memory) {
+    return groups[_groupName].groupMembers;
+  }
+
 }
