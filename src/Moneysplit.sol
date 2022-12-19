@@ -127,24 +127,16 @@ contract MoneySplit is ReentrancyGuard {
 
   // function to remove a member from existing the group but only member of that group can do this 
   function removeMemberFromGroup(string calldata _groupName, address _id) public onlyMember onlyGroupMember(_groupName) {
-    //   uint i = 0;
-    //   while (groups[_groupName].groupMembers[i] != _id) {
-    //       i++;
-    //   }
-    //   for (uint j=i; j<groups[_groupName].groupMembers.length-1;j++) {
-    //       groups[_groupName].groupMembers[j] = groups[_groupName].groupMembers[j+1];
-    //   }
-    //   delete groups[_groupName].groupMembers[groups[_groupName].groupMembers.length - 1];
     //get the index of address in the array
     uint index = 0;
     for (uint j=0; j<groups[_groupName].groupMembers.length-1; j++) {
-        if(address(_id) == address(groups[_groupName].groupMembers[j])) {
-            index = j;
-        }
+      if(address(_id) == address(groups[_groupName].groupMembers[j])) {
+          index = j;
+      }
     }
     for (uint256 i = index; i < groups[_groupName].groupMembers.length - 1; i++) {
-            groups[_groupName].groupMembers[i] = groups[_groupName].groupMembers[i+1];
-        }
+      groups[_groupName].groupMembers[i] = groups[_groupName].groupMembers[i+1];
+    }
     groups[_groupName].groupMembers.pop(); // delete the last item
   }
 
@@ -205,10 +197,10 @@ contract MoneySplit is ReentrancyGuard {
 
   // function to settle the balance to another member and to avoid the reentrancy attack "nonReentrant" modifier is used
   function settleBalance(address payable _toID, uint _amount) onlyMember external payable nonReentrant {
-    members[address(msg.sender)].balances[address(_toID)] -= _amount;
     // sending the ether to another EOA
     // (bool sent,) = _toID.call{value: _amount}("");
     // require(sent, "Failed to send balance");
+    members[address(msg.sender)].balances[address(_toID)] -= _amount;
   }
 
   // Users can send owner donation to help consistently improve the platform 
@@ -229,8 +221,15 @@ contract MoneySplit is ReentrancyGuard {
     emit sentDonations(address(msg.sender), _amount); // emit an event to register the sending the ether to owner
   }
 
-  function showMembers(string calldata _groupName) view public onlyMember onlyGroupMember(_groupName) returns(address[] memory) {
+  // to see all gorup members
+  function showGroupMembers(string calldata _groupName) view public onlyMember onlyGroupMember(_groupName) returns(address[] memory) {
     return groups[_groupName].groupMembers;
   }
 
+  // to see the our balance to pay someone else
+  function showBalances(address _addr) view public onlyMember returns(uint) {
+    return members[msg.sender].balances[_addr];
+  }
+
+  
 }
