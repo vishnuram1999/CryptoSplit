@@ -2,17 +2,21 @@
 pragma solidity ^0.8.15;
 
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-error notOwner();
-error notMember(address, string);
-error notValidAddress(address, string);
-error notGroupMember(string);
+contract CryptoSplit is ReentrancyGuard {
+  AggregatorV3Interface internal priceFeed;
 
-contract MoneySplit is ReentrancyGuard {
-  
   // events initialization
   event Received(address, uint);
   event sentDonations(address, uint);
+
+  // errors
+  error notOwner();
+  error notMember(address, string);
+  error notValidAddress(address, string);
+  error notGroupMember(string);
   
   address public owner;
   uint internal idNumber;
@@ -21,6 +25,7 @@ contract MoneySplit is ReentrancyGuard {
   constructor() payable {
     owner = msg.sender;
     idNumber = 0;
+    priceFeed = AggregatorV3Interface(0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43);
   }
   
   // modifier to identify the transaction sender is owner or not
@@ -59,7 +64,7 @@ contract MoneySplit is ReentrancyGuard {
     string name;
     uint amountSpend;
     mapping(string => uint) expenses;
-    mapping(address => uint) balances;
+    mapping(address => mapping(address => uint)) balances;
     address[] friends;
   }
   
@@ -95,11 +100,11 @@ contract MoneySplit is ReentrancyGuard {
   }
   
   // function to add your expense
-  function addExpense(string memory _expenseName, uint _amount, address _paidID) public onlyMember {
+  function addExpense(string memory _expenseName, uint _amount, address _paidID, address tokenAddress) public onlyMember {
     members[address(msg.sender)].amountSpend += _amount;
     members[address(msg.sender)].expenses[_expenseName] = _amount;
     if (address(msg.sender) != address(_paidID)) {
-        members[address(msg.sender)].balances[address(_paidID)] = _amount;
+        members[address(msg.sender)].balances[address(_paidID)][tokenAddress] = _amount;
     }
   }
   
@@ -141,7 +146,7 @@ contract MoneySplit is ReentrancyGuard {
   }
 
   // function to add a group expense equally between the group memebers
-  function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _paidID) public onlyMember onlyGroupMember(_groupName) {
+  function addExpenseEqualBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _tokenAddress, address _paidID) public onlyMember onlyGroupMember(_groupName) {
       require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
       uint256 lengthOfArray = groups[_groupName].groupMembers.length;
       uint256 amountPerMember = _amount / lengthOfArray;
@@ -151,7 +156,7 @@ contract MoneySplit is ReentrancyGuard {
             members[address(groups[_groupName].groupMembers[i])].amountSpend += amountPerMember;
             members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = amountPerMember;
             if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
-                members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = amountPerMember;
+                members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)][_tokenAddress] = amountPerMember;
             }
             unchecked {
               ++i;
@@ -160,7 +165,7 @@ contract MoneySplit is ReentrancyGuard {
   }
 
   // function to add a group expense unequally between the group memebers with their respective portions
-  function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, uint[] calldata _portions, address _paidID) public onlyMember onlyGroupMember(_groupName) {
+  function addExpenseUnequalBetweenGroup(string calldata _expenseName, string calldata _groupName, uint _amount, address _tokenAddress, uint[] calldata _portions, address _paidID) public onlyMember onlyGroupMember(_groupName) {
     require(groups[_groupName].groupMembers.length != 0, "Group doesn't exist");
     uint256 lengthOfList = _portions.length;
     uint256 sum = 0;
@@ -177,7 +182,7 @@ contract MoneySplit is ReentrancyGuard {
         members[address(groups[_groupName].groupMembers[i])].amountSpend += _portions[i];
         members[address(groups[_groupName].groupMembers[i])].expenses[_expenseName] = _portions[i];
         if(address(groups[_groupName].groupMembers[i]) != address(_paidID)) {
-          members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)] = _portions[i];
+          members[address(groups[_groupName].groupMembers[i])].balances[address(_paidID)][_tokenAddress] = _portions[i];
         }
         unchecked {
             ++i;
@@ -196,11 +201,17 @@ contract MoneySplit is ReentrancyGuard {
   }
 
   // function to settle the balance to another member and to avoid the reentrancy attack "nonReentrant" modifier is used
-  function settleBalance(address payable _toID, uint _amount) onlyMember external payable nonReentrant {
+  function settleBalanceInEther(address payable _toID, uint _amount, address _tokenAddress) onlyMember external payable nonReentrant {
     // sending the ether to another EOA
-    // (bool sent,) = _toID.call{value: _amount}("");
-    // require(sent, "Failed to send balance");
-    members[address(msg.sender)].balances[address(_toID)] -= _amount;
+    members[address(msg.sender)].balances[address(_toID)][_tokenAddress] -= _amount;
+    (bool sent,) = _toID.call{value: _amount}("");
+    require(sent, "Failed to send balance");
+    
+  }
+
+  function settleBalanceInERC20Token(address tokenAddress, address payable _toID, uint _amount, address _tokenAddress) onlyMember external payable nonReentrant {
+    members[address(msg.sender)].balances[address(_toID)][_tokenAddress] -= _amount;
+    ERC20(tokenAddress).transfer(_toID, _amount);
   }
 
   // Users can send owner donation to help consistently improve the platform 
@@ -227,9 +238,12 @@ contract MoneySplit is ReentrancyGuard {
   }
 
   // to see the our balance to pay someone else
-  function showBalances(address _addr) view public onlyMember returns(uint) {
-    return members[msg.sender].balances[_addr];
+  function showBalances(address _addr, address _tokenAddress) view public onlyMember returns(uint) {
+    return members[msg.sender].balances[_addr][_tokenAddress];
   }
 
-  
+  function getLatestPrice() public view returns (int) {
+    (,int price,,,) = priceFeed.latestRoundData();
+    return price;
+  }
 }

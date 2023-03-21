@@ -2,10 +2,10 @@
 pragma solidity ^0.8.15;
 
 import "@forge-std/Test.sol";
-import "../src/MoneySplit.sol";
+import "../src/CryptoSplit.sol";
 
-contract MoneySplitTest is Test {
-    MoneySplit public moneysplit;
+contract CryptoSplitTest is Test {
+    CryptoSplit public cryptosplit;
 
     address public alice = vm.addr(1); // alice
     address public bob = vm.addr(2);   // bob
@@ -15,16 +15,16 @@ contract MoneySplitTest is Test {
 
     function setUp() public {
         vm.startPrank(deployer);
-        moneysplit = new MoneySplit();
+        cryptosplit = new CryptoSplit();
         vm.stopPrank();
         vm.startPrank(alice);
-        moneysplit.createAccount("alice");
+        cryptosplit.createAccount("alice");
         vm.stopPrank();
         vm.startPrank(bob);
-        moneysplit.createAccount("bob");
+        cryptosplit.createAccount("bob");
         vm.stopPrank();
         vm.startPrank(denice);
-        moneysplit.createAccount("denice");
+        cryptosplit.createAccount("denice");
         vm.stopPrank();
     }
 
@@ -32,7 +32,7 @@ contract MoneySplitTest is Test {
         // If alice try to create account with same address, then transcation is reverted. 
         vm.startPrank(alice);
         vm.expectRevert(bytes("You already have an account"));
-        moneysplit.createAccount("alice");
+        cryptosplit.createAccount("alice");
         vm.stopPrank();
     }
     
@@ -40,15 +40,15 @@ contract MoneySplitTest is Test {
         // without an account no one can access the showExpense function 
         vm.startPrank(cain);
         vm.expectRevert();
-        moneysplit.showExpense();
+        cryptosplit.showExpense();
         vm.stopPrank();
     }
 
     function testAddExpense() public {
         vm.startPrank(alice);
-        moneysplit.addExpense("first", 100, alice);
+        cryptosplit.addExpense("first", 100, alice);
         vm.stopPrank();
-        (,,uint amountspend) = moneysplit.members(address(alice));
+        (,,uint amountspend) = cryptosplit.members(address(alice));
         assertEq(amountspend, 100);
     }
 
@@ -57,37 +57,37 @@ contract MoneySplitTest is Test {
         _group[0] = address(alice);
         // alice adding a member to her group
         vm.startPrank(alice);
-        moneysplit.createGroup("rockers", _group);
-        moneysplit.addMemberToGroup("rockers", denice);
+        cryptosplit.createGroup("rockers", _group);
+        cryptosplit.addMemberToGroup("rockers", denice);
         vm.stopPrank();
 
         // bob (not member of rockers) trying to add members to group, which is not not possible
         vm.startPrank(bob);
         vm.expectRevert();
-        moneysplit.addMemberToGroup("rockers", denice);
+        cryptosplit.addMemberToGroup("rockers", denice);
         vm.stopPrank();
 
         // denice trying to add alice to rockers group who already exists
         vm.startPrank(denice);
         vm.expectRevert(bytes("Address already exists in this group!!!"));
-        moneysplit.addMemberToGroup("rockers", alice);
+        cryptosplit.addMemberToGroup("rockers", alice);
         vm.stopPrank();
     }
     
     function testCreateGroup() public {
-        //create a group with already members with moneysplit
+        //create a group with already members with cryptosplit
         address[] memory _group = new address[](2);
         _group[0] = address(alice);
         _group[1] = address(bob);
         vm.startPrank(alice);
-        moneysplit.createGroup("rockers", _group);
+        cryptosplit.createGroup("rockers", _group);
         vm.stopPrank();
 
-        //create a group with non members of moneysplit
+        //create a group with non members of cryptosplit
         _group[1] = address(cain);
         vm.startPrank(alice);
         vm.expectRevert();
-        moneysplit.createGroup("rockers", _group);
+        cryptosplit.createGroup("rockers", _group);
         vm.stopPrank();
     }
 
@@ -97,15 +97,15 @@ contract MoneySplitTest is Test {
         _group[0] = address(alice);
         _group[1] = address(bob);
         vm.startPrank(alice);
-        moneysplit.createGroup("rockers", _group);
-        address[] memory gm = moneysplit.showGroupMembers("rockers");
+        cryptosplit.createGroup("rockers", _group);
+        address[] memory gm = cryptosplit.showGroupMembers("rockers");
         vm.stopPrank();
         assertEq(gm.length, 2); // checking whether the length is 2 
 
         // remove a member from the group
         vm.startPrank(bob);
-        moneysplit.removeMemberFromGroup("rockers", alice);
-        gm = moneysplit.showGroupMembers("rockers");
+        cryptosplit.removeMemberFromGroup("rockers", alice);
+        gm = cryptosplit.showGroupMembers("rockers");
         vm.stopPrank();
 
         assertEq(gm.length, 1); // checking whether the length is 1 because alice is removed
@@ -113,8 +113,8 @@ contract MoneySplitTest is Test {
 
     function testFindExpense() public {
         vm.startPrank(alice);
-        moneysplit.addExpense("peace", 100, alice);
-        (,uint result) = moneysplit.findExpense("peace");
+        cryptosplit.addExpense("peace", 100, alice);
+        (,uint result) = cryptosplit.findExpense("peace");
         vm.stopPrank();
         assertEq(result, 100);
 
