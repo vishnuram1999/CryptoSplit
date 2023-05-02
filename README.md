@@ -18,7 +18,7 @@ All smart contract related to the application is present in `src` directory
 
 Public tests are in `test` directory
 
-Source code for front-end is located in different private repo (under development).
+Source code for front-end is located in separate [repo](https://github.com/vishnuram1999/CryptoSplit-App)
 
 ## Contact 
 

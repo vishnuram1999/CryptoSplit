@@ -3,9 +3,11 @@ pragma solidity ^0.8.15;
 
 import "@forge-std/Test.sol";
 import "../src/CryptoSplit.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract CryptoSplitTest is Test {
     CryptoSplit public cryptosplit;
+    ERC20 public usdc;
 
     address public alice = vm.addr(1); // alice
     address public bob = vm.addr(2);   // bob
@@ -14,42 +16,29 @@ contract CryptoSplitTest is Test {
     address public deployer = vm.addr(4); //deployer
 
     function setUp() public {
+        usdc = new ERC20("Test Token", "TT"); // deploying the testToken
         vm.startPrank(deployer);
         cryptosplit = new CryptoSplit();
-        vm.stopPrank();
-        vm.startPrank(alice);
-        cryptosplit.createAccount("alice");
-        vm.stopPrank();
-        vm.startPrank(bob);
-        cryptosplit.createAccount("bob");
-        vm.stopPrank();
-        vm.startPrank(denice);
-        cryptosplit.createAccount("denice");
-        vm.stopPrank();
-    }
-
-    function testCreateAccount() public {
-        // If alice try to create account with same address, then transcation is reverted. 
-        vm.startPrank(alice);
-        vm.expectRevert(bytes("You already have an account"));
-        cryptosplit.createAccount("alice");
         vm.stopPrank();
     }
     
     function testShowExpense() public {
         // without an account no one can access the showExpense function 
         vm.startPrank(cain);
-        vm.expectRevert();
-        cryptosplit.showExpense();
+        uint256 value = cryptosplit.showExpense(); // expenses in dollars
         vm.stopPrank();
+        assertEq(value, 0);
     }
 
     function testAddExpense() public {
         vm.startPrank(alice);
-        cryptosplit.addExpense("first", 100, alice);
+        cryptosplit.addExpense("first", 100, bob, address(usdc));
+        uint256 balance = cryptosplit.showBalances(bob, address(usdc));
         vm.stopPrank();
-        (,,uint amountspend) = cryptosplit.members(address(alice));
-        assertEq(amountspend, 100);
+
+        uint amountSpend = cryptosplit.members(address(alice));
+        assertEq(amountSpend, 100);
+        assertEq(balance, 100);
     }
 
     function testAddMemberToGroup() public {
@@ -75,18 +64,10 @@ contract CryptoSplitTest is Test {
     }
     
     function testCreateGroup() public {
-        //create a group with already members with cryptosplit
         address[] memory _group = new address[](2);
         _group[0] = address(alice);
         _group[1] = address(bob);
         vm.startPrank(alice);
-        cryptosplit.createGroup("rockers", _group);
-        vm.stopPrank();
-
-        //create a group with non members of cryptosplit
-        _group[1] = address(cain);
-        vm.startPrank(alice);
-        vm.expectRevert();
         cryptosplit.createGroup("rockers", _group);
         vm.stopPrank();
     }
@@ -113,10 +94,18 @@ contract CryptoSplitTest is Test {
 
     function testFindExpense() public {
         vm.startPrank(alice);
-        cryptosplit.addExpense("peace", 100, alice);
-        (,uint result) = cryptosplit.findExpense("peace");
+        cryptosplit.addExpense("peace", 100, bob, address(usdc));
+        (string memory name,uint result) = cryptosplit.findExpense("peace");
         vm.stopPrank();
         assertEq(result, 100);
+        assertEq(name, "peace");
+    }
+
+    function testAddExpenseEqually() public {
+
+    }
+
+    function testPriceFeedOracle() public {
 
     }
 }
