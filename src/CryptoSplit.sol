@@ -60,6 +60,7 @@ contract CryptoSplit is ReentrancyGuard {
     address[] friends;
     string[] groups;
     string[] expensesName;
+    address[] balanceAddresses;
   }
   
   // initialization of structure - Group
@@ -90,6 +91,7 @@ contract CryptoSplit is ReentrancyGuard {
     // only if the expense is paid by different person for you then balance is updated
     if (msg.sender != _paidID) {
         members[msg.sender].balances[_paidID][tokenAddress] += _amount; // this should be in terms of token value
+        members[msg.sender].balanceAddresses.push(_paidID);
     }
   }
   
@@ -238,6 +240,10 @@ contract CryptoSplit is ReentrancyGuard {
 
   function showExpenseAmount(string memory _expenseName) public view returns(uint256) {
     return members[msg.sender].expenses[_expenseName];
+  }
+
+  function showBalanceAddresses() public view returns(address[] memory) {
+    return members[msg.sender].balanceAddresses;
   }
 
   function getLatestPrice() public view returns(int) {
