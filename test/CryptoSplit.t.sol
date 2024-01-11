@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.15;
+pragma solidity 0.8.20;
 
 import "@forge-std/Test.sol";
 import "../src/CryptoSplit.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract TestToken is ERC20 {
+    constructor() ERC20("Test Token", "TT") {
+        _mint(msg.sender, 10_000_000);
+    }
+}
 
 contract CryptoSplitTest is Test {
     CryptoSplit public cryptosplit;
@@ -16,7 +22,7 @@ contract CryptoSplitTest is Test {
     address public deployer = vm.addr(4); //deployer
 
     function setUp() public {
-        usdc = new ERC20("Test Token", "TT"); // deploying the testToken
+        usdc = new TestToken(); // deploying the testToken
         vm.startPrank(deployer);
         cryptosplit = new CryptoSplit();
         vm.stopPrank();
