@@ -7,11 +7,11 @@ import "@openzeppelin-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/access/Ownable2StepUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/access/AccessControlUpgradeable.sol";
 import "@openzeppelin-upgradeable/contracts/proxy/utils/Initializable.sol";
-import "./interfaces/ICryptoSplitV2Group.sol";
+import "../../src/interfaces/ICryptoSplitV2Group.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
-/// @custom:oz-upgrades
-contract CryptoSplitV2Group is
+/// @custom:oz-upgrades-from CryptoSplitV2Group
+contract CryptoSplitV2GroupNew is
     Initializable,
     AccessControlUpgradeable,
     Ownable2StepUpgradeable,
@@ -89,4 +89,8 @@ contract CryptoSplitV2Group is
     function _authorizeUpgrade(
         address newImplementation
     ) internal virtual override onlyOwner {}
+
+    function isUpdated() public pure returns(bool) {
+        return true;
+    }
 }

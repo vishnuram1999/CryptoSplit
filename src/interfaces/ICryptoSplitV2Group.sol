@@ -11,7 +11,7 @@ interface ICryptoSplitV2Group {
 
     function addExpenseEqually(string memory, uint256) external;
 
-    function addExpenseUnequally() external;
+    function addExpenseUnequally(string memory, uint256, uint256[] calldata) external;
 
     function removeExpense(string memory) external;
 
