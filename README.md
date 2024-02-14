@@ -1,4 +1,4 @@
-# CryptoSplit 
+# CryptoSplit
 
 ## About
 
@@ -20,7 +20,12 @@ Public tests are in `test` directory
 
 Source code for front-end is located in separate [repo](https://github.com/vishnuram1999/CryptoSplit-App)
 
-## Contact 
+## Usage
+
+## Contact
 
 Reach out to me [@Vishnuram73](https://twitter.com/Vishnuram73)
 
+## Excalidraw
+
+<https://excalidraw.com/#room=039ab924e5617375d204,jAINMCuxs1X44cpR8QMCgQ>

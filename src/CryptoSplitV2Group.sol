@@ -22,12 +22,24 @@ contract CryptoSplitV2Group is
     event RemovedGroupMember(address);
 
     struct Member {
+        address memberAddress;
         uint256 expense;
     }
 
-    Member[] private members;
+    struct Expense {
+        uint256 totalAmount;
+        uint256[] splitAmount;
+        address[] memberAddress;
+        address paidAddress;
+        // bool unequalFlag;
+        // address tokenAddress;
+    }
 
-    uint256[49] private __gap;
+    Member[] public members;
+    mapping(string expenseName => Expense) public expenses;
+    mapping(address => mapping(address => uint256)) public balances;
+
+    uint256[47] private __gap;
 
     function initialize() external virtual initializer {
         __Ownable_init(msg.sender);
@@ -41,6 +53,7 @@ contract CryptoSplitV2Group is
         _grantRole(bytes32("GroupMember"), memberAddress);
         Member memory initMember;
         initMember.expense = 0;
+        initMember.memberAddress = memberAddress;
         members.push(initMember);
         emit AddedGroupMember(memberAddress);
     }
@@ -62,9 +75,15 @@ contract CryptoSplitV2Group is
 
     function addExpenseEqually(
         string memory expenseName,
-        uint256 totalAmount
+        uint256 totalAmount,
+        address paidAddress
     ) external onlyRole(bytes32("GroupMember")) {
+        require(hasRole(bytes32('GroupMember'), paidAddress), "Not a group member");
         require(totalAmount != 0, "Amount can't be zero");
+        require(
+            expenses[expenseName].totalAmount == 0,
+            "Expense name already exists"
+        );
         uint256 totalMembers = members.length;
         (bool success, uint256 individualAmount) = Math.tryDiv(
             totalAmount,
@@ -74,17 +93,108 @@ contract CryptoSplitV2Group is
         for (uint256 i; i < totalMembers; i++) {
             members[i].expense += individualAmount;
         }
+        expenses[expenseName].totalAmount = totalAmount;
+
+        uint256[] memory splitAmount = new uint256[](totalMembers);
+        for (uint256 i; i < totalMembers; i++) {
+            splitAmount[i] = individualAmount;
+        }
+        expenses[expenseName].splitAmount = splitAmount;
+
+        address[] memory memberAddress = new address[](totalMembers);
+        for (uint256 i; i < totalMembers; i++) {
+            memberAddress[i] = members[i].memberAddress;
+        }
+        expenses[expenseName].memberAddress = memberAddress;
+        
+        for (uint256 i; i < totalMembers; i++) {
+            if (members[i].memberAddress != paidAddress) {
+                balances[members[i].memberAddress][paidAddress] += individualAmount;
+            }
+        }
     }
 
     function addExpenseUnequally(
         string memory expenseName,
         uint256 totalAmount,
-        uint256[] calldata splitAmount
-    ) external onlyRole(bytes32("GroupMember")) {}
+        uint256[] calldata splitAmount,
+        address[] calldata memberAddress,
+        address paidAddress
+    ) external onlyRole(bytes32("GroupMember")) {
+        require(hasRole(bytes32('GroupMember'), paidAddress), "Not a group member");
+        require(
+            splitAmount.length == memberAddress.length,
+            "Array length mismatch"
+        );
+        require(totalAmount != 0, "Amount can't be zero");
+        require(
+            expenses[expenseName].totalAmount == 0,
+            "Expense name already exists"
+        );
+        uint256 totalMembers = members.length;
+        uint256 totalSplitAmount;
+        for (uint256 i; i < splitAmount.length; i++) {
+            totalSplitAmount += splitAmount[i];
+        }
+        require(totalSplitAmount == totalAmount, "Split amount mismatch");
+        for (uint256 i; i < totalMembers; i++) {
+            for (uint256 j; j < memberAddress.length; j++) {
+                if (members[i].memberAddress == memberAddress[j]) {
+                    members[i].expense += splitAmount[j];
+                }
+                if (members[i].memberAddress != paidAddress) {
+                    balances[members[i].memberAddress][paidAddress] += splitAmount[j];
+                }
+            }
+        }
+
+        expenses[expenseName].totalAmount = totalAmount;
+        expenses[expenseName].splitAmount = splitAmount;
+        expenses[expenseName].memberAddress = memberAddress;
+    }
 
     function removeExpense(
         string memory expenseName
-    ) external onlyRole(bytes32("GroupMember")) {}
+    ) external onlyRole(bytes32("GroupMember")) {
+        for (uint256 i; i < members.length; i++) {
+            for (uint256 j; j < expenses[expenseName].memberAddress.length; j++) {
+                if (members[i].memberAddress == expenses[expenseName].memberAddress[j]) {
+                    members[i].expense -= expenses[expenseName].splitAmount[j];
+                    balances[members[i].memberAddress][expenses[expenseName].paidAddress] -= expenses[expenseName].splitAmount[j];
+                }
+            }
+        }
+        delete expenses[expenseName];
+    }
+
+    function getExpense(string memory expenseName)
+        external
+        view
+        returns (Expense memory)
+    {
+        return expenses[expenseName];
+    }
+
+    function getMember(address memberAddress)
+        external
+        view
+        returns (Member memory)
+    {
+        for (uint256 i; i < members.length; i++) {
+            if (members[i].memberAddress == memberAddress) {
+                return members[i];
+            }
+        }
+        return Member(address(0), 0);
+    }
+
+    function getBalance(address memberAddress, address paidAddress)
+        external
+        view
+        returns (uint256)
+    {
+        return balances[memberAddress][paidAddress];
+    }
 
     function _authorizeUpgrade(
         address newImplementation

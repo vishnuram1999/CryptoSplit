@@ -9,9 +9,9 @@ interface ICryptoSplitV2Group {
 
     function removeAuthMember(address) external;
 
-    function addExpenseEqually(string memory, uint256) external;
+    function addExpenseEqually(string memory, uint256, address) external;
 
-    function addExpenseUnequally(string memory, uint256, uint256[] calldata) external;
+    function addExpenseUnequally(string memory, uint256, uint256[] calldata, address[] calldata, address) external;
 
     function removeExpense(string memory) external;
 
