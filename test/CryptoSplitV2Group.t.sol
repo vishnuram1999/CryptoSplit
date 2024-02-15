@@ -71,6 +71,19 @@ contract CryptoSplitV2GroupTest is Test {
         vm.stopPrank();
     }
 
+    function testMemberAlreadyExist() public {
+        vm.startPrank(deployer);
+        cryptosplitgroup.addAuthMember(deployer);
+        cryptosplitgroup.addMember(alice);
+        cryptosplitgroup.addMember(bob);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        vm.expectRevert();
+        cryptosplitgroup.addMember(alice);
+        vm.stopPrank();
+    }
+
     function testAddExpenseEqually() public {
         vm.startPrank(deployer);
         cryptosplitgroup.addAuthMember(deployer);
@@ -96,7 +109,6 @@ contract CryptoSplitV2GroupTest is Test {
         testAddExpenseEqually();
         vm.startPrank(deployer);
         cryptosplitgroup.addAuthMember(deployer);
-        cryptosplitgroup.addMember(alice);
         cryptosplitgroup.addMember(bob);
         vm.stopPrank();
 
@@ -130,13 +142,8 @@ contract CryptoSplitV2GroupTest is Test {
         assertEq(bobBalanceToBob, 0);
     }
 
-    function testRemoveExpense() public {
+    function testRemoveUnequalExpense() public {
         testAddExpenseUnequally();
-        vm.startPrank(deployer);
-        cryptosplitgroup.addAuthMember(deployer);
-        cryptosplitgroup.addMember(alice);
-        cryptosplitgroup.addMember(bob);
-        vm.stopPrank();
 
         vm.startPrank(alice);
         uint256[] memory splitAmount = new uint256[](2);
@@ -154,7 +161,7 @@ contract CryptoSplitV2GroupTest is Test {
         CryptoSplitV2Group.Member memory memberBob = cryptosplitgroup.getMember(bob);
         assertEq(memberAlice.expense, 200);
         assertEq(memberBob.expense, 100);
-
+        
         vm.startPrank(alice);
         cryptosplitgroup.removeExpense("third");
         vm.stopPrank();
@@ -165,7 +172,83 @@ contract CryptoSplitV2GroupTest is Test {
         memberBob = cryptosplitgroup.getMember(bob);
         assertEq(memberAlice.expense, 160);
         assertEq(memberBob.expense, 40);
+
+        uint256 aliceBalanceToBob = cryptosplitgroup.getBalance(alice, bob);
+        assertEq(aliceBalanceToBob, 60);
     }
+
+    function testRemoveNotExpenseMember() public {
+        vm.startPrank(deployer);
+        cryptosplitgroup.addAuthMember(deployer);
+        cryptosplitgroup.addMember(alice);
+        cryptosplitgroup.addMember(bob);
+        cryptosplitgroup.addMember(denice);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        uint256[] memory splitAmount = new uint256[](2);
+        address[] memory memberAddress = new address[](2);
+        splitAmount[0] = 40;
+        splitAmount[1] = 60;
+        memberAddress[0] = alice;
+        memberAddress[1] = bob;
+        cryptosplitgroup.addExpenseUnequally("fourth", 100, splitAmount, memberAddress, bob);
+        vm.stopPrank();
+
+        // denice can't
+        vm.startPrank(denice);
+        vm.expectRevert();
+        cryptosplitgroup.removeExpense("fourth");
+        vm.stopPrank();
+
+        // but alice can
+        vm.startPrank(alice);
+        cryptosplitgroup.removeExpense("fourth");
+        vm.stopPrank();
+    }
+
+    function testRemoveEqualExpense() public {
+        testAddExpenseUnequally();
+
+        vm.startPrank(alice);
+        cryptosplitgroup.addExpenseEqually("fourth", 100, alice);
+        vm.stopPrank();
+        CryptoSplitV2Group.Expense memory expense = cryptosplitgroup.getExpense("fourth");
+        assertEq(expense.totalAmount, 100);
+
+        CryptoSplitV2Group.Member memory memberAlice = cryptosplitgroup.getMember(alice);
+        CryptoSplitV2Group.Member memory memberBob = cryptosplitgroup.getMember(bob);
+        assertEq(memberAlice.expense, 210);
+        assertEq(memberBob.expense, 90);
+
+        vm.startPrank(alice);
+        cryptosplitgroup.removeExpense("fourth");
+        vm.stopPrank();
+        expense = cryptosplitgroup.getExpense("fourth");
+        assertEq(expense.totalAmount, 0);
+
+        memberAlice = cryptosplitgroup.getMember(alice);
+        memberBob = cryptosplitgroup.getMember(bob);
+        assertEq(memberAlice.expense, 160);
+        assertEq(memberBob.expense, 40);
+
+        uint256 aliceBalanceToBob = cryptosplitgroup.getBalance(alice, bob);
+        assertEq(aliceBalanceToBob, 60);
+    }
+
+    function testRemoveExpenseDoesNotExist() public {
+        vm.startPrank(deployer);
+        cryptosplitgroup.addAuthMember(deployer);
+        cryptosplitgroup.addMember(alice);
+        cryptosplitgroup.addMember(bob);
+        vm.stopPrank();
+
+        vm.startPrank(alice);
+        vm.expectRevert();
+        cryptosplitgroup.removeExpense("fifth");
+        vm.stopPrank();
+    }
+
 
     function test_upgrade() public {
         vm.startPrank(deployer, deployer);

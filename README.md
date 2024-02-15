@@ -22,6 +22,11 @@ Source code for front-end is located in separate [repo](https://github.com/vishn
 
 ## Usage
 
+```shell
+forge build
+forge test
+```
+
 ## Contact
 
 Reach out to me [@Vishnuram73](https://twitter.com/Vishnuram73)

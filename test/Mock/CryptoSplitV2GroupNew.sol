@@ -37,7 +37,7 @@ contract CryptoSplitV2GroupNew is
     mapping(string expenseName => Expense) public expenses;
     mapping(address => mapping(address => uint256)) public balances;
 
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     function initialize() external virtual initializer {
         __Ownable_init(msg.sender);

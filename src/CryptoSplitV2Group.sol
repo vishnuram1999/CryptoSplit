@@ -31,7 +31,6 @@ contract CryptoSplitV2Group is
         uint256[] splitAmount;
         address[] memberAddress;
         address paidAddress;
-        // bool unequalFlag;
         // address tokenAddress;
     }
 
@@ -50,6 +49,7 @@ contract CryptoSplitV2Group is
     function addMember(
         address memberAddress
     ) external onlyRole(bytes32("AuthMember")) {
+        require(!hasRole(bytes32('GroupMember'), memberAddress), "Already a group member");
         _grantRole(bytes32("GroupMember"), memberAddress);
         Member memory initMember;
         initMember.expense = 0;
@@ -84,34 +84,31 @@ contract CryptoSplitV2Group is
             expenses[expenseName].totalAmount == 0,
             "Expense name already exists"
         );
+        _grantRole(keccak256(abi.encode(bytes32('ExpenseMember'), bytes(expenseName))), paidAddress);
         uint256 totalMembers = members.length;
         (bool success, uint256 individualAmount) = Math.tryDiv(
             totalAmount,
             totalMembers
         );
         require(success, "Operation failed");
-        for (uint256 i; i < totalMembers; i++) {
-            members[i].expense += individualAmount;
-        }
-        expenses[expenseName].totalAmount = totalAmount;
 
         uint256[] memory splitAmount = new uint256[](totalMembers);
-        for (uint256 i; i < totalMembers; i++) {
-            splitAmount[i] = individualAmount;
-        }
-        expenses[expenseName].splitAmount = splitAmount;
-
         address[] memory memberAddress = new address[](totalMembers);
-        for (uint256 i; i < totalMembers; i++) {
-            memberAddress[i] = members[i].memberAddress;
-        }
-        expenses[expenseName].memberAddress = memberAddress;
         
         for (uint256 i; i < totalMembers; i++) {
+            members[i].expense += individualAmount;
+            splitAmount[i] = individualAmount;
+            _grantRole(keccak256(abi.encode(bytes32('ExpenseMember'), bytes(expenseName))), members[i].memberAddress);
+            memberAddress[i] = members[i].memberAddress;
             if (members[i].memberAddress != paidAddress) {
                 balances[members[i].memberAddress][paidAddress] += individualAmount;
             }
         }
+
+        expenses[expenseName].totalAmount = totalAmount;
+        expenses[expenseName].memberAddress = memberAddress;
+        expenses[expenseName].splitAmount = splitAmount;
+        expenses[expenseName].paidAddress = paidAddress;
     }
 
     function addExpenseUnequally(
@@ -137,13 +134,17 @@ contract CryptoSplitV2Group is
             totalSplitAmount += splitAmount[i];
         }
         require(totalSplitAmount == totalAmount, "Split amount mismatch");
+
+        _grantRole(keccak256(abi.encode(bytes32('ExpenseMember'), bytes(expenseName))), paidAddress);
+        
         for (uint256 i; i < totalMembers; i++) {
             for (uint256 j; j < memberAddress.length; j++) {
                 if (members[i].memberAddress == memberAddress[j]) {
+                    _grantRole(keccak256(abi.encode(bytes32('ExpenseMember'), bytes(expenseName))), memberAddress[j]);
                     members[i].expense += splitAmount[j];
-                }
-                if (members[i].memberAddress != paidAddress) {
-                    balances[members[i].memberAddress][paidAddress] += splitAmount[j];
+                    if (memberAddress[j] != paidAddress) {
+                        balances[memberAddress[j]][paidAddress] += splitAmount[j];
+                    }
                 }
             }
         }
@@ -151,16 +152,25 @@ contract CryptoSplitV2Group is
         expenses[expenseName].totalAmount = totalAmount;
         expenses[expenseName].splitAmount = splitAmount;
         expenses[expenseName].memberAddress = memberAddress;
+        expenses[expenseName].paidAddress = paidAddress;
     }
 
     function removeExpense(
         string memory expenseName
     ) external onlyRole(bytes32("GroupMember")) {
+        require(
+            expenses[expenseName].totalAmount != 0,
+            "Expense name doesn't exist"
+        );
+        require(hasRole(keccak256(abi.encode(bytes32('ExpenseMember'), bytes(expenseName))), msg.sender), "Not a part of expense");
+
         for (uint256 i; i < members.length; i++) {
             for (uint256 j; j < expenses[expenseName].memberAddress.length; j++) {
                 if (members[i].memberAddress == expenses[expenseName].memberAddress[j]) {
                     members[i].expense -= expenses[expenseName].splitAmount[j];
-                    balances[members[i].memberAddress][expenses[expenseName].paidAddress] -= expenses[expenseName].splitAmount[j];
+                    if (expenses[expenseName].memberAddress[j] != expenses[expenseName].paidAddress) {
+                        balances[members[i].memberAddress][expenses[expenseName].paidAddress] -= expenses[expenseName].splitAmount[j];
+                    }
                 }
             }
         }
